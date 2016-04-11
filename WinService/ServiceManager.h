@@ -12,16 +12,12 @@ public:
 	{
 		Logger::debug(pMsg);
 	}
-
-	void install(char* pPath, char* pName)
+	bool install(char* pPath, char* pName)
 	{  
+		bool ret = false;
 		SC_HANDLE schSCManager = OpenSCManager( NULL, NULL, SC_MANAGER_CREATE_SERVICE); 
-		if (schSCManager==0) 
-		{
-			long nError = GetLastError();
-			char pTemp[121];
-			sprintf(pTemp, "OpenSCManager failed, error code = %d\n", nError);
-			WriteLog(pTemp);
+		if (schSCManager==0) {
+			Logger::debug("OpenSCManager failed, error code = %d\n", GetLastError());
 		}
 		else
 		{
@@ -40,24 +36,17 @@ public:
 				NULL,                      /* LocalSystem account     */ 
 				NULL
 				);                    
-			if (schService==0) 
-			{
-				long nError =  GetLastError();
-				char pTemp[121];
-				sprintf(pTemp, "Failed to create service %s, error code = %d\n", pName, nError);
-				WriteLog(pTemp);
+			if (schService==0) {
+				Logger::debug("Failed to create service %s, error code = %d\n", pName, GetLastError());
 			}
-			else
-			{
-				char pTemp[121];
-				sprintf(pTemp, "Service %s installed\n", pName);
-				WriteLog(pTemp);
-				CloseServiceHandle(schService); 
+			else {
+				Logger::debug("Service %s installed\n", pName);
+				ret = true;
 			}
 			CloseServiceHandle(schSCManager);
 		}	
+		return ret;
 	}
-
 	void uninstall(char* pName)
 	{
 		SC_HANDLE schSCManager = OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS); 
@@ -97,7 +86,6 @@ public:
 			CloseServiceHandle(schSCManager);	
 		}
 	}
-
 	bool kill_service(char* pName) 
 	{ 
 		// kill service with given name
@@ -143,7 +131,6 @@ public:
 		}
 		return false;
 	}
-
 	bool run_service(char* pName) 
 	{ 
 		// run service with given name

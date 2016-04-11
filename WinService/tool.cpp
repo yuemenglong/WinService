@@ -78,14 +78,14 @@ void Logger::log(const char* fmt, ...){
 
 void Logger::debug(const char* fmt, ...){
 #ifdef _DEBUG
+	char output_fmt[1024];
+	sprintf(output_fmt, "[Logger]=>%s\n", fmt);
 	char str[1024];
 	va_list arg_ptr;
 	va_start(arg_ptr, fmt);
-	vsprintf(str, fmt, arg_ptr);
+	vsprintf(str, output_fmt, arg_ptr);
 	va_end(arg_ptr);
-
 	OutputDebugStringA(str);
-	OutputDebugStringA("\n");
 #else
 	return;
 #endif
