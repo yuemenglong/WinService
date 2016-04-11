@@ -8,16 +8,6 @@
 #define		MAX_NUM_OF_PROCESS		4
 /** Window Service **/
 VOID ServiceMainProc();
-VOID Install(char* pPath, char* pName);
-VOID UnInstall(char* pName);
-VOID WriteLog(char* pMsg);
-BOOL KillService(char* pName);
-BOOL RunService(char* pName);
-VOID ExecuteSubProcess();
-VOID ProcMonitorThread(VOID *);
-BOOL StartProcess(int ProcessIndex);
-VOID EndProcess(int ProcessIndex);
-VOID AttachProcessNames();
 
 VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv);
 VOID WINAPI ServiceHandler(DWORD fdwControl);
@@ -35,10 +25,6 @@ bool running = false;
 /** Window Service **/
 const int nBufferSize = 500;
 CHAR pServiceName[nBufferSize+1];
-CHAR pExeFile[nBufferSize+1];
-CHAR lpCmdLineData[nBufferSize+1];
-CHAR pLogFile[nBufferSize+1];
-BOOL ProcessStarted = TRUE;
 
 SERVICE_TABLE_ENTRY lpServiceStartTable[] = 
 {
@@ -87,11 +73,6 @@ VOID ServiceMainProc()
 	if(!StartServiceCtrlDispatcher(lpServiceStartTable)) {
 		Logger::debug("StartServiceCtrlDispatcher failed, error code = %d\n", GetLastError());
 	}
-}
-
-VOID WriteLog(char* pMsg)
-{
-	Logger::debug(pMsg);
 }
 
 VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
@@ -168,7 +149,6 @@ VOID WINAPI ServiceHandler(DWORD fdwControl)
 	{
 		case SERVICE_CONTROL_STOP:
 		case SERVICE_CONTROL_SHUTDOWN:
-			ProcessStarted = FALSE;
 			ServiceStatus.dwWin32ExitCode = 0; 
 			ServiceStatus.dwCurrentState  = SERVICE_STOPPED; 
 			ServiceStatus.dwCheckPoint    = 0; 
