@@ -111,8 +111,11 @@ public:
 		return false;
 	}
 	static bool is_service_env(){
-		HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-		return handle == 0;
+		DWORD dwSessionId;
+		ProcessIdToSessionId(GetCurrentProcessId(), &dwSessionId);
+		return dwSessionId == 0;
+		//HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		//return handle == 0;
 	}
 	static bool create_process_as_user(char* cmd, PROCESS_INFORMATION* info){
 		if(!cmd){

