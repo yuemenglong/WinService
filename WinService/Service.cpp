@@ -283,12 +283,9 @@ BOOL RunProcess(LPSTR cmd)
 	BOOL bResult = CreateProcessAsUser(hToken, NULL, cmd, NULL, NULL,
 		FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
 	CloseHandle(hToken);
-	if(bResult)
-	{
+	if(bResult){
 		Logger::debug("CreateProcessAsUser ok!\r\n");
-	}
-	else
-	{
+	}else{
 		Logger::debug("CreateProcessAsUser false!\r\n");
 	}
 	return bResult;

