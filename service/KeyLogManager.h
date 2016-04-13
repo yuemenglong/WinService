@@ -1,5 +1,7 @@
 #pragma once
 #include "tool.h"
+#include "Logger.h"
+#include "SharedMemory.h"
 
 class HookManager
 {

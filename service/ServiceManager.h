@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include "tool.h"
+#include "Logger.h"
 #include "tlhelp32.h" 
 
 class ServiceManager
