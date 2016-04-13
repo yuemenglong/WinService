@@ -10,6 +10,7 @@
 #include <iostream>
 #include <tchar.h>
 #include <stdio.h>
+#include <WinSock2.h>
 #include <windows.h>
 #include <winbase.h>
 #include <winsvc.h>

