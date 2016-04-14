@@ -19,7 +19,7 @@ public:
 		HANDLE handle = OpenProcess(
 			PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
 			FALSE,
-		pid /* This is the PID, you can find one from windows task manager */
+			pid 
 			);
 		if(handle <= 0){
 			return false;
@@ -49,4 +49,5 @@ public:
 		return true;
 	}
 
+	
 };
