@@ -21,3 +21,10 @@ service.vcxproj
 service.vcxproj.filters
 service.vcxproj.user
 test
+7z/7z.vcxproj
+7z/7z.vcxproj.filters
+7z/7z.vcxproj.user
+7z/7zVersion.rc
+service/7z.lib
+
+

